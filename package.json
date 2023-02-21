@@ -1,0 +1,31 @@
+{
+  "name": "totjs",
+  "version": "0.0.1",
+  "description": "Not totally new but a file format for managing human readable data in a file",
+  "main": "dist/index.js",
+  "bin": "dist/index.js",
+  "scripts": {
+    "test": "node ./test/test-bgraphdb.js",
+    "pack": "npx webpack --config webpack.config.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/opdev1004/totjs.git"
+  },
+  "keywords": [
+    "file format",
+    "data store",
+    "data management",
+    "data manager"
+  ],
+  "author": "Victor Chanil Park",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/opdev1004/totjs/issues"
+  },
+  "homepage": "https://github.com/opdev1004/totjs#readme",
+  "devDependencies": {
+    "webpack": "^5.75.0",
+    "webpack-cli": "^5.0.1"
+  }
+}
