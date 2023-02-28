@@ -112,11 +112,35 @@ async function test()
         {
             console.log(`rabbit push returns: ${ result }`);
         });
-    await tot.push("frog", "A frog is any member of a diverse and carnivorous group of tailless amphibians belonging to the order Anura.").then((result) =>
-    {
-        console.log(`frog push returns: ${ result }`);
-    });
+    await tot.push("frog", "A frog is any member of a diverse and carnivorous group of tailless amphibians belonging to the order Anura.")
+        .then((result) =>
+        {
+            console.log(`frog push returns: ${ result }`);
+        });
     await tot.clean();
+
+    await tot.open("test.tot");
+    await tot.create();
+    await tot.push("frog", "A frog is any member of a diverse and carnivorous group of tailless amphibians belonging to the order Anura.")
+        .then((result) =>
+        {
+            console.log(`frog push returns2: ${ result }`);
+        });
+    await tot.getDataByName("frog")
+        .then((result) =>
+        {
+            console.log(result);
+        });
+    await tot.push("test", "<d:test>This is test!</d:test>")
+        .then((result) =>
+        {
+            console.log(`test push returns2: ${ result }`);
+        });
+    await tot.getDataByName("test")
+        .then((result) =>
+        {
+            console.log(result);
+        });
 }
 
 test();

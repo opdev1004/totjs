@@ -8,7 +8,7 @@ module.exports = {
     filename: 'index.js',
     path: path.resolve(__dirname, "dist"),
     library: {
-      name: 'BGraphDB',
+      name: 'Tot',
       type: 'umd',
     },
   },
