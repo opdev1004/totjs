@@ -14,21 +14,29 @@ module.exports = class tot
         this.mutex = new Mutex();
     }
 
-    open(filename)
+    async open(filename)
     {
         this.filename = filename;
     }
 
-    close()
+    async close()
     {
         this.filename = undefined;
+    }
+
+    async create()
+    {
+        fs.writeFile(this.filename, '', { encoding: this.encoding }, (error) =>
+        {
+            console.error(error);
+        });
     }
 
     async getDataByName(name)
     {
         if (!name)
         {
-            console.error("name is undefined or null or empty");
+            console.error("getDataByName Error: name is undefined or null or empty");
             return "";
         }
 
@@ -50,6 +58,8 @@ module.exports = class tot
             }
         }).catch(error => { console.error(error); return ""; });
 
+        data = await data.replaceAll("<|~", "<d:");
+        data = await data.replaceAll("<?|~", "</d:");
         return data;
     }
 
@@ -126,11 +136,11 @@ module.exports = class tot
             });
             reader.on('end', () =>
             {
-                if (!inTag)
+                if (!tagEnded)
                 {
                     reject(`getDataByName Error: Tag "<d:${ name }>" not found in file`);
                 }
-                else if (!tagEnded)
+                else if (inTag)
                 {
                     reject(`getDataByName Error: No closing tag "</d:${ name }>" found for "<d:${ name }>"`);
                 }
@@ -142,7 +152,12 @@ module.exports = class tot
     {
         if (!name || !data)
         {
-            console.error(`name or data may not be appropriate`);
+            console.error(`push Error: name or data may not be appropriate`);
+            return false;
+        }
+        else if (data.includes("<|~") || data.includes("<?|~"))
+        {
+            console.error(`push Error: The data must not contain the following characters: "<|~" or "<?|~"`);
             return false;
         }
 
@@ -150,13 +165,15 @@ module.exports = class tot
 
         if (isExists.result)
         {
-            console.error(`Tag "<d:${ name }>" is found in file`)
+            console.error(`push Error: Tag "<d:${ name }>" is found in file`)
             return false;
         }
 
         await this.waitForReadingCountToBeZero()
         this.lock = true;
         await this.mutex.acquire();
+        data = await data.replaceAll("<d:", "<|~");
+        data = await data.replaceAll("</d:", "<?|~");
         let result = await this.processPushing(name, data);
         await this.mutex.release();
         this.lock = false;
@@ -177,9 +194,12 @@ module.exports = class tot
             {
                 reject(error);
             });
+            writer.on('finish', () =>
+            {
+                resolve(true);
+            });
             writer.write(content);
             writer.end();
-            resolve(true);
         }).catch(error =>
         {
             console.error(error);
@@ -189,7 +209,7 @@ module.exports = class tot
 
     async isOpenTagExists(name)
     {
-        if (!name) throw new Error("name may not be appropriate");
+        if (!name) throw new Error("isOpenTagExists Error: name may not be appropriate");
 
         return new Promise((resolve, reject) =>
         {
@@ -275,7 +295,7 @@ module.exports = class tot
 
     async isCloseTagExists(name)
     {
-        if (!name) throw new Error("name may not be appropriate");
+        if (!name) throw new Error("isCloseTagExists Error: name may not be appropriate");
 
         return new Promise((resolve, reject) =>
         {
@@ -364,7 +384,7 @@ module.exports = class tot
     {
         if (!name)
         {
-            console.error(`name may not be appropriate`);
+            console.error(`hardRemove Error: name may not be appropriate`);
             return false;
         }
 
@@ -372,12 +392,12 @@ module.exports = class tot
 
         if (!isExists.result)
         {
-            console.error(`Tag "<d:${ name }>" is not found in file`)
+            console.error(`hardRemove Error: Tag "<d:${ name }>" is not found in file`)
             return false;
         }
         else if (isExists.position < 0)
         {
-            console.error(`Unexpected error: file position cannot be negative`);
+            console.error(`hardRemove Error: file position cannot be negative`);
             return false;
         }
 
@@ -508,7 +528,7 @@ module.exports = class tot
             });
             writer.on('error', (error) =>
             {
-                writer.close();
+                writer.end();
                 reject(error);
             });
             writer.on('finish', () =>
@@ -528,7 +548,7 @@ module.exports = class tot
     {
         if (!name)
         {
-            console.error(`name may not be appropriate`);
+            console.error(`remove Error: name may not be appropriate`);
             return false;
         }
 
@@ -537,12 +557,12 @@ module.exports = class tot
 
         if (!isExists1.result || !isExists2.result)
         {
-            console.error(`Tag "<d:${ name }>" is not found in file`)
+            console.error(`remove Error: Tag "<d:${ name }>" is not found in file`)
             return false;
         }
         else if (isExists1.position < 0 || isExists2.position < 0)
         {
-            console.error(`Unexpected error: file position cannot be negative`);
+            console.error(`remove Error: file position cannot be negative`);
             return false;
         }
 
@@ -618,10 +638,6 @@ module.exports = class tot
                 }
             });
 
-            reader.on('data', (chunk) =>
-            {
-
-            });
             reader.on('error', (error) =>
             {
                 reader.close();
@@ -629,7 +645,7 @@ module.exports = class tot
             });
             writer.on('error', (error) =>
             {
-                writer.close();
+                writer.end();
                 reject(error);
             });
             writer.on('finish', () =>
@@ -700,10 +716,6 @@ module.exports = class tot
                 }
             });
 
-            reader.on('data', (chunk) =>
-            {
-
-            });
             reader.on('error', (error) =>
             {
                 reader.close();
@@ -711,7 +723,7 @@ module.exports = class tot
             });
             writer.on('error', (error) =>
             {
-                writer.close();
+                writer.end();
                 reject(error);
             });
             writer.on('finish', () =>
@@ -850,7 +862,7 @@ module.exports = class tot
             });
             writer.on('error', (error) =>
             {
-                writer.close();
+                writer.end();
                 reject(error);
             });
             writer.on('finish', () =>
