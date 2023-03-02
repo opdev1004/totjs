@@ -407,14 +407,8 @@ module.exports = class tot
 
         let result = await this.processHardRemove(name);
 
-        try
-        {
-            fs.renameSync(`${ this.filename }.tmp`, this.filename);
-        }
-        catch (error)
-        {
-            console.error(error);
-        }
+        await fs.promises.rename(`${ this.filename }.tmp`, this.filename)
+            .catch((error) => { result = false; console.error(error); });
 
         await this.mutex.release();
         this.lock = false;
@@ -749,14 +743,8 @@ module.exports = class tot
 
         let result = await this.processClean();
 
-        try
-        {
-            fs.renameSync(`${ this.filename }.tmp`, this.filename);
-        }
-        catch (error)
-        {
-            console.error(error);
-        }
+        await fs.promises.rename(`${ this.filename }.tmp`, this.filename)
+            .catch((error) => { result = false; console.error(error); });
 
         await this.mutex.release();
         this.lock = false;
