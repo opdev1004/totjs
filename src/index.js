@@ -172,9 +172,11 @@ module.exports = class tot
         await this.waitForReadingCountToBeZero()
         this.lock = true;
         await this.mutex.acquire();
+
         data = await data.replaceAll("<d:", "<|~");
         data = await data.replaceAll("</d:", "<?|~");
         let result = await this.processPushing(name, data);
+
         await this.mutex.release();
         this.lock = false;
         return result;
@@ -205,6 +207,106 @@ module.exports = class tot
             console.error(error);
             return false;
         });
+    }
+
+    async update(name, data)
+    {
+        if (!name || !data)
+        {
+            console.error(`update Error: name or data may not be appropriate`);
+            return false;
+        }
+        else if (data.includes("<|~") || data.includes("<?|~"))
+        {
+            console.error(`update Error: The data must not contain the following characters: "<|~" or "<?|~"`);
+            return false;
+        }
+
+        let isExists1 = await this.isOpenTagExists(name);
+        let isExists2 = await this.isCloseTagExists(name);
+
+        if (!isExists1.result || !isExists2.result)
+        {
+            console.error(`update Error: Tag "<d:${ name }>" is not found in file`)
+            return false;
+        }
+        else if (isExists1.position < 0 || isExists2.position < 0)
+        {
+            console.error(`update Error: file position cannot be negative`);
+            return false;
+        }
+
+        await this.waitForReadingCountToBeZero()
+        this.lock = true;
+        await this.mutex.acquire();
+
+        let result1 = await this.processRemoveOpenTag(name, isExists1.position);
+        let result2 = await this.processRemoveCloseTag(name, isExists2.position);
+
+        if (!result1 || !result2)
+        {
+            console.error(`update Error: Could not remove "<d:${ name }>". Data is not inserted. Try clean a file and then 'push' data instead of using 'update'.`)
+            return false;
+        }
+
+        data = await data.replaceAll("<d:", "<|~");
+        data = await data.replaceAll("</d:", "<?|~");
+        let result = await this.processPushing(name, data);
+
+        await this.mutex.release();
+        this.lock = false;
+        return result;
+    }
+
+
+    async hardUpdate(name, data)
+    {
+        if (!name || !data)
+        {
+            console.error(`hardUpdate Error: name or data may not be appropriate`);
+            return false;
+        }
+        else if (data.includes("<|~") || data.includes("<?|~"))
+        {
+            console.error(`hardUpdate Error: The data must not contain the following characters: "<|~" or "<?|~"`);
+            return false;
+        }
+
+        let isExists1 = await this.isOpenTagExists(name);
+        let isExists2 = await this.isCloseTagExists(name);
+
+        if (!isExists1.result || !isExists2.result)
+        {
+            console.error(`hardUpdate Error: Tag "<d:${ name }>" is not found in file`)
+            return false;
+        }
+        else if (isExists1.position < 0 || isExists2.position < 0)
+        {
+            console.error(`hardUpdate Error: file position cannot be negative`);
+            return false;
+        }
+
+        await this.waitForReadingCountToBeZero()
+        this.lock = true;
+        await this.mutex.acquire();
+
+        let resultRemove = await this.processHardRemove(name);
+        await fs.promises.rename(`${ this.filename }.tmp`, this.filename)
+            .catch((error) => { resultRemove = false; console.error(error); });
+
+        if (!resultRemove)
+        {
+            console.error(`hardUpdate Error: Could not remove "<d:${ name }>". Data is not inserted. Try clean a file and then 'push' data instead of using 'hardUpdate'.`)
+            return false;
+        }
+
+        data = await data.replaceAll("<d:", "<|~");
+        data = await data.replaceAll("</d:", "<?|~");
+        let result = await this.processPushing(name, data);
+
+        await this.mutex.release();
+        this.lock = false;
+        return result;
     }
 
     async isOpenTagExists(name)
@@ -303,7 +405,7 @@ module.exports = class tot
             {
                 this.readingCount = this.readingCount + 1;
 
-                this.processIsOpenTagExists(name).then(result =>
+                this.processIsCloseTagExists(name).then(result =>
                 {
                     this.readingCount = this.readingCount - 1;
                     resolve(result);

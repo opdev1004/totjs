@@ -85,6 +85,20 @@ const Tot = require('totjs');
                 console.log(`rabbit push returns: ${ result }`);
             });
 
+        // this is how we update data, there is the version that doese with hard remove.
+        await tot.update("rabbit", "Rabbits are small mammals in the family.")
+            .then((result) =>
+            {
+                console.log(`rabbit update returns: ${ result }`);
+            });
+
+        await tot.hardUpdate("rabbit", "Rabbits are small mammals in the family.")
+            .then((result) =>
+            {
+                console.log(`rabbit update returns: ${ result }`);
+            });
+
+
         // This marks the tag to be removed after clean() called
         await tot.remove("rabbit")
             .then((result) =>
