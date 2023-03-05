@@ -1,7 +1,10 @@
 # 🥇 Tot.js
 Tot is not totally new but a file format for managing data in a file. This is JS version of managing a Tot file format. There are JSON, XML and many other formats available. And this is just an another format that look like markup language but it is much more simplified. This format only takes the advantage of tags that we know where the start of data is and where the end of data is. And storing the name of data. This format can handle massive data as it is designed to be that way but it cannot be more than what hardware can handle. Just like how other structured formats can't. So limiting a data in one tag might be useful to handle unexpected behavior. It is up to user and up to user's hardwares. Normally you can write a code to limit the data up to 64KiB (65536 bytes). That would just be good and big enough in general.
 
-Tot.js use String for everything. So mostly it is using functions from String object for better performance. It is using mutex and something similar to semaphore (We have not added limits yet..) so it can safer way to handle data in a single file. Make sure you make a backup of your tot file.
+Tot.js use String for everything. So mostly it is using functions from String object for better performance. It is using mutex and something similar to semaphore (We have not added limits yet..) so it can handle data in a single file safely. Make sure you make a backup of your tot file.
+
+## 👨‍🏫 Notice
+Some cases Tot can cause lots of writing. It is sill better than always writing whole data file though. However I recoomend avoid using hardRemove() or hardUpdate(). They only exist for small files. It is always better when you modify small with update() and remove(). And use clean() like once a day, a week or a month.
 
 ## ▶️ Install
 ```
