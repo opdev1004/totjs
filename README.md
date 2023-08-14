@@ -65,12 +65,20 @@ npm i totjs
 5. Escaping. You can use entities or use your own escaping mechanism. But we support one escaping mechanism by default. If you don't escape your data would not be added to the file.
 
 ```
-// our escaping
+// our escaping in manual typing
 <\d:data>
 <\/d:data>
 // They are going to converted for you when you call get function.
 <\d:data> -> <d:data>
 <\/d:data> -> </d:data>
+
+//If you use it within programming language, string:
+// our escaping
+<\\d:data>
+<\\/d:data>
+// They are going to converted for you when you call get function.
+<\\d:data> -> <d:data>
+<\\/d:data> -> </d:data>
 ```
 
 6. Escaping for strings or characters above not allowed
