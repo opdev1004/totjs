@@ -1,8 +1,8 @@
 const fs = require('fs');
 const { Transform } = require('stream');
-const Mutex = require('./mutex');
+const Mutex = require('./lib/mutex');
 
-module.exports = class tot
+module.exports = class Tot
 {
     constructor(filename = undefined, encoding = 'utf8', highWaterMark = 64 * 1024)
     {
@@ -32,6 +32,129 @@ module.exports = class tot
         });
     }
 
+
+    async getDataByNameAt(name, position)
+    {
+        if (!name)
+        {
+            console.error("getDataByNameAt Error: name is undefined or null or empty");
+            return "";
+        }
+
+        if (!position || typeof position !== "number")
+        {
+            console.error("getDataByNameAt Error: position is undefined or null or empty or not a number");
+            return "";
+        }
+
+        let data = await new Promise((resolve, reject) =>
+        {
+            if (!this.lock)
+            {
+                this.readingCount = this.readingCount + 1;
+
+                this.processGetDataByName(name).then(data =>
+                {
+                    this.readingCount = this.readingCount - 1;
+                    resolve(data);
+                }).catch(error =>
+                {
+                    this.readingCount = this.readingCount - 1;
+                    reject(error);
+                });
+            }
+        }).catch(error => { console.error(error); return ""; });
+
+        data = await data.replaceAll("<\d:", "<d:");
+        data = await data.replaceAll("<\/d:", "</d:");
+        return data;
+    }
+
+    processGetDataByNameAt(name, position)
+    {
+        return new Promise((resolve, reject) =>
+        {
+            let tagStart = `<d:${ name }>`;
+            let tagEnd = `</d:${ name }>`;
+            let data = ""
+            let processingChunk = "";
+            let previousChunk = "";
+            let inTag = false;
+            let tagEnded = false;
+            let index = 0;
+
+            const reader = fs.createReadStream(this.filename, { highWaterMark: this.highWaterMark, encoding: this.encoding, start: position });
+
+            reader.on('data', (chunk) =>
+            {
+                if (previousChunk !== "")
+                {
+                    processingChunk = previousChunk + chunk;
+                }
+                else
+                {
+                    processingChunk += chunk;
+                }
+
+                while (processingChunk.length > 0)
+                {
+                    if (!inTag)
+                    {
+                        index = processingChunk.indexOf(tagStart);
+
+                        if (index > -1)
+                        {
+                            inTag = true;
+                            processingChunk = processingChunk.slice(index + tagStart.length);
+                        }
+                        else
+                        {
+                            previousChunk = processingChunk.slice(-tagStart.length);
+                            processingChunk = "";
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        index = processingChunk.indexOf(tagEnd);
+
+                        if (index > -1)
+                        {
+                            inTag = false;
+                            data += processingChunk.substring(0, index);
+                            processingChunk = "";
+                            tagEnded = true;
+                            resolve(data);
+                            reader.close();
+                        }
+                        else
+                        {
+                            data += processingChunk.slice(0, -tagEnd.length)
+                            previousChunk = processingChunk.slice(-tagEnd.length);
+                            processingChunk = "";
+                            break;
+                        }
+                    }
+                }
+            });
+            reader.on('error', (e) =>
+            {
+                reject(e);
+            });
+            reader.on('end', () =>
+            {
+                if (!tagEnded)
+                {
+                    reject(`getDataByNameAt Error: Tag "<d:${ name }>" not found in file`);
+                }
+                else if (inTag)
+                {
+                    reject(`getDataByNameAt Error: No closing tag "</d:${ name }>" found for "<d:${ name }>"`);
+                }
+            });
+        }).catch(error => { throw error; });
+    }
+
     async getDataByName(name)
     {
         if (!name)
@@ -58,8 +181,8 @@ module.exports = class tot
             }
         }).catch(error => { console.error(error); return ""; });
 
-        data = await data.replaceAll("<|~", "<d:");
-        data = await data.replaceAll("<?|~", "</d:");
+        data = await data.replaceAll("<\d:", "<d:");
+        data = await data.replaceAll("<\/d:", "</d:");
         return data;
     }
 
@@ -155,9 +278,9 @@ module.exports = class tot
             console.error(`push Error: name or data may not be appropriate`);
             return false;
         }
-        else if (data.includes("<|~") || data.includes("<?|~"))
+        else if (data.includes("<d:") || data.includes("</d:"))
         {
-            console.error(`push Error: The data must not contain the following characters: "<|~" or "<?|~"`);
+            console.error(`push Error: The data must not contain the following characters: "<d:" or "</d:"`);
             return false;
         }
 
@@ -173,8 +296,6 @@ module.exports = class tot
         this.lock = true;
         await this.mutex.acquire();
 
-        data = await data.replaceAll("<d:", "<|~");
-        data = await data.replaceAll("</d:", "<?|~");
         let result = await this.processPushing(name, data);
 
         await this.mutex.release();
@@ -216,9 +337,9 @@ module.exports = class tot
             console.error(`update Error: name or data may not be appropriate`);
             return false;
         }
-        else if (data.includes("<|~") || data.includes("<?|~"))
+        else if (data.includes("<d:") || data.includes("</d:"))
         {
-            console.error(`update Error: The data must not contain the following characters: "<|~" or "<?|~"`);
+            console.error(`update Error: The data must not contain the following characters: "<d:" or "</d:"`);
             return false;
         }
 
@@ -249,8 +370,6 @@ module.exports = class tot
             return false;
         }
 
-        data = await data.replaceAll("<d:", "<|~");
-        data = await data.replaceAll("</d:", "<?|~");
         let result = await this.processPushing(name, data);
 
         await this.mutex.release();
@@ -266,9 +385,9 @@ module.exports = class tot
             console.error(`hardUpdate Error: name or data may not be appropriate`);
             return false;
         }
-        else if (data.includes("<|~") || data.includes("<?|~"))
+        else if (data.includes("<d:") || data.includes("</d:"))
         {
-            console.error(`hardUpdate Error: The data must not contain the following characters: "<|~" or "<?|~"`);
+            console.error(`hardUpdate Error: The data must not contain the following characters: "<d:" or "</d:"`);
             return false;
         }
 
@@ -300,8 +419,6 @@ module.exports = class tot
             return false;
         }
 
-        data = await data.replaceAll("<d:", "<|~");
-        data = await data.replaceAll("</d:", "<?|~");
         let result = await this.processPushing(name, data);
 
         await this.mutex.release();
