@@ -1,6 +1,6 @@
 {
   "name": "totjs",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Not totally new but a file format for managing human readable data in a file",
   "main": "dist/index.js",
   "bin": "dist/index.js",

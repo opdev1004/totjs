@@ -65,8 +65,8 @@ module.exports = class Tot
             }
         }).catch(error => { console.error(error); return ""; });
 
-        data = await data.replaceAll("<\d:", "<d:");
-        data = await data.replaceAll("<\/d:", "</d:");
+        data = await data.replaceAll("<\\d:", "<d:");
+        data = await data.replaceAll("<\\/d:", "</d:");
         return data;
     }
 
@@ -181,8 +181,8 @@ module.exports = class Tot
             }
         }).catch(error => { console.error(error); return ""; });
 
-        data = await data.replaceAll("<\d:", "<d:");
-        data = await data.replaceAll("<\/d:", "</d:");
+        data = await data.replaceAll("<\\d:", "<d:");
+        data = await data.replaceAll("<\\/d:", "</d:");
         return data;
     }
 

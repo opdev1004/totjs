@@ -131,7 +131,7 @@ async function test()
         {
             console.log(result);
         });
-    await tot.push("test", "<d:test>This is test!</d:test>")
+    await tot.push("test", "<\\d:test>This is test!<\\/d:test>")
         .then((result) =>
         {
             console.log(`test push returns2: ${ result }`);
