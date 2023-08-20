@@ -32,6 +32,202 @@ module.exports = class Tot
         });
     }
 
+    getAll()
+    {
+        return new Promise((resolve, reject) =>
+        {
+            if (!this.lock)
+            {
+                this.readingCount = this.readingCount + 1;
+
+                this.processGetAll().then(data =>
+                {
+                    this.readingCount = this.readingCount - 1;
+                    resolve(data);
+                }).catch(error =>
+                {
+                    this.readingCount = this.readingCount - 1;
+                    reject(error);
+                });
+            }
+        }).catch(error => { console.error(error); return ""; });
+    }
+
+    processGetAll()
+    {
+        return new Promise((resolve, reject) =>
+        {
+            fs.readFile(this.filename, this.encoding, function (error, data) 
+            {
+
+                if (error) reject(error);
+                else
+                {
+                    const result = {};
+                    let temp = data;
+
+                    while (temp.length > 0)
+                    {
+                        const startTag = "<d:";
+                        const startIndex = temp.indexOf(startTag);
+                        if (startIndex === -1)
+                        {
+                            break;
+                        }
+
+                        const endIndex = temp.indexOf(">", startIndex + startTag.length);
+                        if (endIndex === -1)
+                        {
+                            break;
+                        }
+
+                        const tagName = temp.substring(startIndex + startTag.length, endIndex);
+
+                        const startTagData = ">";
+                        const endTagData = "</d:" + tagName + ">";
+                        const tagDataStartIndex = temp.indexOf(startTagData, endIndex) + startTagData.length;
+                        const tagDataEndIndex = temp.indexOf(endTagData, tagDataStartIndex);
+                        if (tagDataStartIndex === -1 || tagDataEndIndex === -1)
+                        {
+                            break;
+                        }
+
+                        const tagData = temp.substring(tagDataStartIndex, tagDataEndIndex)
+
+                        result[tagName] = tagData;
+                        temp = temp.substring(tagDataEndIndex + endTagData.length);
+                    }
+
+                    resolve(result)
+                }
+            });
+        }).catch(error => { throw error; });
+    }
+
+    getDataByPrefix(prefix, size)
+    {
+        if (!prefix)
+        {
+            console.error("getDataByPrefix Error: prefix is undefined or null or empty");
+            return "";
+        }
+        else if (!size || size < 1 || typeof size !== "number")
+        {
+            console.error("getDataByPrefix Error: size is undefined or null or empty or just wrong number");
+            return "";
+        }
+
+
+        return new Promise((resolve, reject) =>
+        {
+            if (!this.lock)
+            {
+                this.readingCount = this.readingCount + 1;
+
+                this.processGetDataByPrefix(prefix, size).then(data =>
+                {
+                    this.readingCount = this.readingCount - 1;
+                    resolve(data);
+                }).catch(error =>
+                {
+                    this.readingCount = this.readingCount - 1;
+                    reject(error);
+                });
+            }
+        }).catch(error => { console.error(error); return ""; });
+    }
+
+    processGetDataByPrefix(prefix, size)
+    {
+        return new Promise((resolve, reject) =>
+        {
+            let result = {};
+            let tagStart = `<d:${ prefix }`;
+            let tagEnd = `</d:${ prefix }`;
+            let data = ""
+            let processingChunk = "";
+            let previousChunk = "";
+            let inTag = false;
+            let itemSize = 0;
+            let index = 0;
+            let tagName = "";
+
+            const reader = fs.createReadStream(this.filename, { highWaterMark: this.highWaterMark, encoding: this.encoding });
+
+            reader.on('data', (chunk) =>
+            {
+                if (previousChunk !== "")
+                {
+                    processingChunk = previousChunk + chunk;
+                }
+                else
+                {
+                    processingChunk += chunk;
+                }
+
+                while (processingChunk.length > 0)
+                {
+                    if (!inTag)
+                    {
+                        index = processingChunk.indexOf(tagStart);
+
+                        if (index > -1)
+                        {
+                            let oldIndex = index;
+                            index = processingChunk.indexOf(">", index);
+                            tagName = processingChunk.substring(oldIndex + 3, index);
+                            inTag = true;
+                            processingChunk = processingChunk.slice(index + 1);
+                        }
+                        else
+                        {
+                            previousChunk = processingChunk.slice(-tagStart.length);
+                            processingChunk = "";
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        index = processingChunk.indexOf(tagEnd);
+
+                        if (index > -1)
+                        {
+                            inTag = false;
+                            data += processingChunk.substring(0, index);
+                            index = processingChunk.indexOf(">", index);
+                            processingChunk = processingChunk.substring(index + 1);
+                            data = data.replaceAll("<\\d:", "<d:");
+                            data = data.replaceAll("<\\/d:", "</d:");
+                            result[tagName] = data;
+                            itemSize++;
+                            data = "";
+
+                            if (itemSize >= size)
+                            {
+                                resolve(result);
+                                reader.close();
+                            }
+                        }
+                        else
+                        {
+                            data += processingChunk.slice(0, -tagEnd.length)
+                            previousChunk = processingChunk.slice(-tagEnd.length);
+                            processingChunk = "";
+                            break;
+                        }
+                    }
+                }
+            });
+            reader.on('error', (e) =>
+            {
+                reject(e);
+            });
+            reader.on('end', () =>
+            {
+                resolve(result);
+            });
+        }).catch(error => { throw error; });
+    }
 
     async getDataByNameAt(name, position)
     {
@@ -278,10 +474,16 @@ module.exports = class Tot
             console.error(`push Error: name or data may not be appropriate`);
             return false;
         }
-        else if (data.includes("<d:") || data.includes("</d:"))
+        else if (name.includes("<d:") || name.includes("</d:"))
         {
-            console.error(`push Error: The data must not contain the following characters: "<d:" or "</d:"`);
+            console.error(`push Error: name is not appropriate`);
             return false;
+        }
+
+        if (data.includes("<d:") || data.includes("</d:"))
+        {
+            data = await data.replaceAll("<d:", "<\\d:");
+            data = await data.replaceAll("</d:", "<\\/d:");
         }
 
         let isExists = await this.isOpenTagExists(name);
@@ -337,11 +539,13 @@ module.exports = class Tot
             console.error(`update Error: name or data may not be appropriate`);
             return false;
         }
-        else if (data.includes("<d:") || data.includes("</d:"))
+
+        if (data.includes("<d:") || data.includes("</d:"))
         {
-            console.error(`update Error: The data must not contain the following characters: "<d:" or "</d:"`);
-            return false;
+            data = await data.replaceAll("<d:", "<\\d:");
+            data = await data.replaceAll("</d:", "<\\/d:");
         }
+
 
         let isExists1 = await this.isOpenTagExists(name);
         let isExists2 = await this.isCloseTagExists(name);
@@ -385,10 +589,11 @@ module.exports = class Tot
             console.error(`hardUpdate Error: name or data may not be appropriate`);
             return false;
         }
-        else if (data.includes("<d:") || data.includes("</d:"))
+
+        if (data.includes("<d:") || data.includes("</d:"))
         {
-            console.error(`hardUpdate Error: The data must not contain the following characters: "<d:" or "</d:"`);
-            return false;
+            data = await data.replaceAll("<d:", "<\\d:");
+            data = await data.replaceAll("</d:", "<\\/d:");
         }
 
         let isExists1 = await this.isOpenTagExists(name);

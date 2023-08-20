@@ -6,6 +6,12 @@ Tot.js use String for everything. So mostly it is using functions from String ob
 
 ## 👨‍🏫 Notice
 
+### 🎉 From version 0.1.2
+
+From this version we support getDataByPrefix(prefix, size) and getAll(). They return the Javascript object that contains multiple keys and values. Be careful for loading a huge data.
+
+### 📢 About how you handle data writes
+
 Some cases Tot can cause lots of writing. It is sill better than always writing whole data file though. However I recommend avoid using hardRemove() or hardUpdate(). They only exist for small files. It is always better when you modify small with update() and remove(). And use clean() like once a day, a week or a month.
 
 ## ▶️ Install
@@ -66,19 +72,19 @@ npm i totjs
 
 ```
 // our escaping in manual typing
-<\d:data>
-<\/d:data>
+<\d:
+<\/d:
 // They are going to converted for you when you call get function.
-<\d:data> -> <d:data>
-<\/d:data> -> </d:data>
+<\d: -> <d:
+<\/d: -> </d:
 
 //If you use it within programming language, string:
 // our escaping
-<\\d:data>
-<\\/d:data>
+<\\d:
+<\\/d:
 // They are going to converted for you when you call get function.
-<\\d:data> -> <d:data>
-<\\/d:data> -> </d:data>
+<\\d: -> <d:
+<\\/d: -> </d:
 ```
 
 6. Escaping for strings or characters above not allowed
