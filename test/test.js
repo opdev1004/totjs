@@ -5,7 +5,7 @@ async function test()
     const tot = new Tot("data.tot", 'utf8', 1024);
 
     console.log(await tot.getDataByName("dog"));
-
+    /*
     await tot.getDataByName("cat").then(function (result)
     {
         console.log(result);
@@ -141,6 +141,20 @@ async function test()
         {
             console.log(result);
         });
+    await tot.open("data.tot");
+    await tot.getAll()
+        .then((result) =>
+        {
+            console.log("get all working");
+            console.log(result);
+        })
+    */
+    await tot.getDataByPrefix("ho", 2)
+        .then((result) =>
+        {
+            console.log("prefix working?");
+            console.log(result);
+        })
 }
 
 test();
