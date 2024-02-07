@@ -1,11 +1,14 @@
 {
   "name": "totjs",
-  "version": "0.1.2",
-  "description": "Not totally new but a file format for managing human readable data in a file",
+  "version": "1.0.0",
+  "description": "Markup-like Database without Indexing",
   "main": "dist/index.js",
-  "bin": "dist/index.js",
+  "bin": {
+    "totjs": "dist/index.js"
+  },
   "scripts": {
-    "pack": "npx webpack --config webpack.config.js"
+    "pack": "npx webpack --config webpack.config.js",
+    "test": "npx jest"
   },
   "repository": {
     "type": "git",
@@ -15,7 +18,10 @@
     "file format",
     "data store",
     "data management",
-    "data manager"
+    "data manager",
+    "database",
+    "IO system",
+    "Markup"
   ],
   "author": "Victor Chanil Park",
   "license": "MIT",
@@ -24,7 +30,13 @@
   },
   "homepage": "https://github.com/opdev1004/totjs#readme",
   "devDependencies": {
+    "jest": "^29.7.0",
     "webpack": "^5.75.0",
     "webpack-cli": "^5.0.1"
+  },
+  "jest": {
+    "testMatch": [
+      "<rootDir>/test/**/*.js"
+    ]
   }
 }

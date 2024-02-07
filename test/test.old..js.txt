@@ -1,0 +1,158 @@
+const Tot = require('../src/index.js');
+
+async function test()
+{
+    const tot = new Tot("data.tot", 1024, 'utf8');
+
+    console.log(`0. ${ await tot.getDataByName("dog") }`);
+
+    tot.getDataByName("cat").then(function (result)
+    {
+        console.log(`1. ${ result }`);
+    });
+
+    tot.getDataByName("horse").then(function (result)
+    {
+        console.log(`2. ${ result }`);
+    });
+
+    tot.push("frog", "A frog is any member of a diverse and carnivorous group of tailless amphibians belonging to the order Anura.").then((result) =>
+    {
+        console.log(`3. frog push returns: ${ result }`);
+    });
+    tot.push("duck", "Duck is the bird from numerous species of waterfowl in the family Anatidae.")
+        .then((result) =>
+        {
+            console.log(`4. duck push returns: ${ result }`);
+        });
+    tot.push("rabbit", "Rabbits are small mammals in the family.")
+        .then((result) =>
+        {
+            console.log(`5. rabbit push returns: ${ result }`);
+        });
+    tot.push("test", "this is a test")
+        .then((result) =>
+        {
+            console.log(`6. test push returns: ${ result }`);
+        });
+    tot.getDataByName("rabbit")
+        .then((result) =>
+        {
+            console.log(`7. ${ result }`);
+        });
+
+    tot.getDataByName("test")
+        .then((result) =>
+        {
+            console.log(`8. ${ result }`);
+        });
+    tot.getDataByName("test3")
+        .then((result) =>
+        {
+            console.log(`9. ${ result }`);
+        });
+
+    tot.isOpenTagExists("test")
+        .then((result) =>
+        {
+            console.log(`10. test exists?: ${ result.result }`);
+        });
+
+    tot.isOpenTagExists("rabbit")
+        .then((result) =>
+        {
+            console.log(`11. rabbit exists?: ${ result.result }`);
+        });
+
+    tot.isOpenTagExists("test2")
+        .then((result) =>
+        {
+            console.log(`12. test2 exists?: ${ result.result }`);
+        });
+    tot.push("test", "this is a test")
+        .then((result) =>
+        {
+            console.log(`13. test push returns: ${ result }`);
+        });
+    tot.hardRemove("rabbit")
+        .then((result) =>
+        {
+            console.log(`14. ${ result }`);
+        });
+    tot.remove("test")
+        .then((result) =>
+        {
+            console.log(`15. ${ result }`);
+        });
+    tot.remove("duck")
+        .then((result) =>
+        {
+            console.log(`16. ${ result }`);
+        });
+    tot.push("rabbit", "Rabbits are small mammals in the family.")
+        .then((result) =>
+        {
+            console.log(`17. rabbit push returns: ${ result }`);
+        });
+    tot.remove("rabbit")
+        .then((result) =>
+        {
+            console.log(`18. ${ result }`);
+        });
+    tot.remove("frog")
+        .then((result) =>
+        {
+            console.log(`19. ${ result }`);
+        });
+    tot.push("rabbit", "Rabbits are small mammals in the family.")
+        .then((result) =>
+        {
+            console.log(`20. rabbit push returns: ${ result }`);
+        });
+    tot.push("frog", "A frog is any member of a diverse and carnivorous group of tailless amphibians belonging to the order Anura.")
+        .then((result) =>
+        {
+            console.log(`21. frog push returns: ${ result }`);
+        });
+    tot.clean();
+
+    tot.open("test.tot");
+    tot.create();
+    tot.push("frog", "A frog is any member of a diverse and carnivorous group of tailless amphibians belonging to the order Anura.")
+        .then((result) =>
+        {
+            console.log(`22. frog push returns: ${ result }`);
+        });
+    tot.getDataByName("frog")
+        .then((result) =>
+        {
+            console.log(`23. ${ result }`);
+        });
+    tot.push("test", "<\\d:test>This is test!<\\/d:test>")
+        .then((result) =>
+        {
+            console.log(`24. test push returns: ${ result }`);
+        });
+    tot.getDataByName("test")
+        .then((result) =>
+        {
+            console.log(`25. ${ result }`);
+        });
+    tot.open("data.tot");
+    tot.getAll()
+        .then((result) =>
+        {
+            console.log("26. get all working");
+            console.log(result);
+        })
+
+
+    tot.getDataByPrefix("ho", 2)
+        .then((result) =>
+        {
+            console.log("27. prefix working?");
+            console.log(result);
+        })
+}
+
+test();
