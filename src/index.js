@@ -1,56 +1,94 @@
 const fs = require('fs');
 const { Transform } = require('stream');
-const Mutex = require('./lib/mutex');
 
 module.exports = class Tot
 {
-    constructor(filename = undefined, encoding = 'utf8', highWaterMark = 64 * 1024)
+    constructor(filename = undefined, indexingSize = 8 * 1024, encoding = 'utf8', highWaterMark = 64 * 1024)
     {
         this.filename = filename;
+        this.indexingSize = indexingSize;
         this.encoding = encoding;
         this.highWaterMark = highWaterMark;
-        this.readingCount = 0;
-        this.lock = false;
-        this.mutex = new Mutex();
+        this.taskQueue = [];
+        this.runningTask = false;
+    }
+
+    pushTask(task)
+    {
+        return new Promise((resolve, reject) =>
+        {
+            this.taskQueue.push({ task, resolve, reject });
+
+            if (!this.runningTask)
+            {
+                this.doTask();
+            }
+        }).catch(error => { console.error(error); return null; });
+    }
+
+    async doTask()
+    {
+        if (this.taskQueue.length > 0)
+        {
+            this.runningTask = true;
+            const { task, resolve, reject } = this.taskQueue.shift();
+
+            try
+            {
+                const result = await task();
+                resolve(result);
+            }
+            catch (error)
+            {
+                reject(error);
+            }
+
+            this.doTask();
+        }
+        else
+        {
+            this.runningTask = false;
+        }
     }
 
     async open(filename)
     {
-        this.filename = filename;
+        await this.pushTask(async () =>
+        {
+            this.filename = filename;
+        });
     }
 
     async close()
     {
-        this.filename = undefined;
+        this.pushTask(async () =>
+        {
+            this.filename = undefined;
+        });
     }
 
     async create()
     {
-        fs.writeFile(this.filename, '', { encoding: this.encoding }, (error) =>
+        this.pushTask(async () =>
         {
-            console.error(error);
+            await fs.promises.writeFile(this.filename, '', { encoding: this.encoding }, (error) =>
+            {
+                console.error(error);
+            });
         });
     }
 
-    getAll()
+    async getAll()
     {
-        return new Promise((resolve, reject) =>
+        const result = await this.pushTask(async () =>
         {
-            if (!this.lock)
-            {
-                this.readingCount = this.readingCount + 1;
+            const result = await this.processGetAll();
 
-                this.processGetAll().then(data =>
-                {
-                    this.readingCount = this.readingCount - 1;
-                    resolve(data);
-                }).catch(error =>
-                {
-                    this.readingCount = this.readingCount - 1;
-                    reject(error);
-                });
-            }
-        }).catch(error => { console.error(error); return ""; });
+            if (result) return result;
+            else return null;
+        });
+
+        return result;
     }
 
     processGetAll()
@@ -101,47 +139,39 @@ module.exports = class Tot
                     resolve(result)
                 }
             });
-        }).catch(error => { throw error; });
+        }).catch(error => { console.error(error); return null; });
     }
 
-    getDataByPrefix(prefix, size)
+    async getDataByPrefix(prefix, size)
     {
         if (!prefix)
         {
             console.error("getDataByPrefix Error: prefix is undefined or null or empty");
-            return "";
         }
         else if (!size || size < 1 || typeof size !== "number")
         {
             console.error("getDataByPrefix Error: size is undefined or null or empty or just wrong number");
-            return "";
         }
 
-
-        return new Promise((resolve, reject) =>
+        const result = await this.pushTask(async () =>
         {
-            if (!this.lock)
-            {
-                this.readingCount = this.readingCount + 1;
+            const result = this.processGetDataByPrefix(prefix, size);
 
-                this.processGetDataByPrefix(prefix, size).then(data =>
-                {
-                    this.readingCount = this.readingCount - 1;
-                    resolve(data);
-                }).catch(error =>
-                {
-                    this.readingCount = this.readingCount - 1;
-                    reject(error);
-                });
-            }
-        }).catch(error => { console.error(error); return ""; });
+            if (result) return result;
+            else return null;
+        });
+
+        return result;
     }
 
-    processGetDataByPrefix(prefix, size)
+    processGetDataByPrefix(prefix, size = 0)
     {
         return new Promise((resolve, reject) =>
         {
             let result = {};
+
+            if (size == 0) resolve(result);
+
             let tagStart = `<d:${ prefix }`;
             let tagEnd = `</d:${ prefix }`;
             let data = ""
@@ -226,7 +256,7 @@ module.exports = class Tot
             {
                 resolve(result);
             });
-        }).catch(error => { throw error; });
+        }).catch(error => { console.error(error); return null; });
     }
 
     async getDataByNameAt(name, position)
@@ -236,34 +266,22 @@ module.exports = class Tot
             console.error("getDataByNameAt Error: name is undefined or null or empty");
             return "";
         }
-
-        if (!position || typeof position !== "number")
+        else if (!position || typeof position !== "number")
         {
             console.error("getDataByNameAt Error: position is undefined or null or empty or not a number");
             return "";
         }
 
-        let data = await new Promise((resolve, reject) =>
+        const result = await this.pushTask(async () =>
         {
-            if (!this.lock)
-            {
-                this.readingCount = this.readingCount + 1;
+            const result = await this.processGetDataByName(name);
 
-                this.processGetDataByName(name).then(data =>
-                {
-                    this.readingCount = this.readingCount - 1;
-                    resolve(data);
-                }).catch(error =>
-                {
-                    this.readingCount = this.readingCount - 1;
-                    reject(error);
-                });
-            }
-        }).catch(error => { console.error(error); return ""; });
+            if (result) return result;
+            else if (result == "") return "";
+            else return null;
+        });
 
-        data = await data.replaceAll("<\\d:", "<d:");
-        data = await data.replaceAll("<\\/d:", "</d:");
-        return data;
+        return result;
     }
 
     processGetDataByNameAt(name, position)
@@ -348,7 +366,7 @@ module.exports = class Tot
                     reject(`getDataByNameAt Error: No closing tag "</d:${ name }>" found for "<d:${ name }>"`);
                 }
             });
-        }).catch(error => { throw error; });
+        }).catch(error => { console.error(error); return null; });
     }
 
     async getDataByName(name)
@@ -359,27 +377,16 @@ module.exports = class Tot
             return "";
         }
 
-        let data = await new Promise((resolve, reject) =>
+        const result = await this.pushTask(async () =>
         {
-            if (!this.lock)
-            {
-                this.readingCount = this.readingCount + 1;
+            const result = this.processGetDataByName(name);
 
-                this.processGetDataByName(name).then(data =>
-                {
-                    this.readingCount = this.readingCount - 1;
-                    resolve(data);
-                }).catch(error =>
-                {
-                    this.readingCount = this.readingCount - 1;
-                    reject(error);
-                });
-            }
-        }).catch(error => { console.error(error); return ""; });
+            if (result) return result;
+            else if (result == "") return "";
+            else return null;
+        });
 
-        data = await data.replaceAll("<\\d:", "<d:");
-        data = await data.replaceAll("<\\/d:", "</d:");
-        return data;
+        return result;
     }
 
     processGetDataByName(name)
@@ -464,7 +471,7 @@ module.exports = class Tot
                     reject(`getDataByName Error: No closing tag "</d:${ name }>" found for "<d:${ name }>"`);
                 }
             });
-        }).catch(error => { throw error; });
+        }).catch(error => { console.error(error); return null; });
     }
 
     async push(name, data)
@@ -479,29 +486,28 @@ module.exports = class Tot
             console.error(`push Error: name is not appropriate`);
             return false;
         }
-
-        if (data.includes("<d:") || data.includes("</d:"))
+        else if (data.includes("<d:") || data.includes("</d:"))
         {
-            data = await data.replaceAll("<d:", "<\\d:");
-            data = await data.replaceAll("</d:", "<\\/d:");
-        }
-
-        let isExists = await this.isOpenTagExists(name);
-
-        if (isExists.result)
-        {
-            console.error(`push Error: Tag "<d:${ name }>" is found in file`)
+            console.error(`push Error: Make sure escape any '<d:' or '</d'.`);
             return false;
         }
 
-        await this.waitForReadingCountToBeZero()
-        this.lock = true;
-        await this.mutex.acquire();
+        const result = await this.pushTask(async () =>
+        {
+            let isExists = await this.processIsOpenTagExists(name);
 
-        let result = await this.processPushing(name, data);
+            if (isExists && isExists.result)
+            {
+                console.error(`push Error: Tag "<d:${ name }>" is found in file`)
+                return false;
+            }
+            else
+            {
+                const result = await this.processPushing(name, data);
+                return result;
+            }
+        });
 
-        await this.mutex.release();
-        this.lock = false;
         return result;
     }
 
@@ -537,47 +543,58 @@ module.exports = class Tot
         if (!name || !data)
         {
             console.error(`update Error: name or data may not be appropriate`);
-            return false;
+            return null;
         }
-
-        if (data.includes("<d:") || data.includes("</d:"))
+        else if (data.includes("<d:") || data.includes("</d:"))
         {
-            data = await data.replaceAll("<d:", "<\\d:");
-            data = await data.replaceAll("</d:", "<\\/d:");
+            console.error(`update Error: Make sure escape any '<d:' or '</d'.`);
+            return null;
         }
 
-
-        let isExists1 = await this.isOpenTagExists(name);
-        let isExists2 = await this.isCloseTagExists(name);
-
-        if (!isExists1.result || !isExists2.result)
+        const result = await this.pushTask(async () =>
         {
-            console.error(`update Error: Tag "<d:${ name }>" is not found in file`)
-            return false;
-        }
-        else if (isExists1.position < 0 || isExists2.position < 0)
-        {
-            console.error(`update Error: file position cannot be negative`);
-            return false;
-        }
+            let isExists1 = await this.processIsOpenTagExists(name);
 
-        await this.waitForReadingCountToBeZero()
-        this.lock = true;
-        await this.mutex.acquire();
+            if (!isExists1 || !isExists1.result)
+            {
+                console.error(`hardUpdate Error: Open Tag "<d:${ name }>" is not found in file`)
+                return null;
+            }
+            else if (!isExists1.position && isExists1.position < 0)
+            {
+                console.error(`hardUpdate Error: Open Tag file position is negative value. Eg. null, value < 0`);
+                return null;
+            }
 
-        let result1 = await this.processRemoveOpenTag(name, isExists1.position);
-        let result2 = await this.processRemoveCloseTag(name, isExists2.position);
+            let isExists2 = await this.processIsCloseTagExists(name, isExists1.position);
 
-        if (!result1 || !result2)
-        {
-            console.error(`update Error: Could not remove "<d:${ name }>". Data is not inserted. Try clean a file and then 'push' data instead of using 'update'.`)
-            return false;
-        }
+            if (!isExists2 || !isExists2.result)
+            {
+                console.error(`hardUpdate Error: Open Tag "<d:${ name }>" is not found in file`)
+                return null;
+            }
+            else if (!isExists2.position && isExists2.position < 0)
+            {
+                console.error(`hardUpdate Error: Open Tag file position is negative value. Eg. null, value < 0`);
+                return null;
+            }
 
-        let result = await this.processPushing(name, data);
 
-        await this.mutex.release();
-        this.lock = false;
+
+            let result1 = await this.processRemoveOpenTag(name, isExists1.position);
+            let result2 = await this.processRemoveCloseTag(name, isExists2.position);
+
+            if (!result1 || !result2)
+            {
+                console.error(`update Error: Could not remove "<d:${ name }>". Data is not inserted. Try clean a file and then 'push' data instead of using 'update'.`)
+                return null;
+            }
+
+            const result = await this.processPushing(name, data);
+
+            return result;
+        });
+
         return result;
     }
 
@@ -587,81 +604,90 @@ module.exports = class Tot
         if (!name || !data)
         {
             console.error(`hardUpdate Error: name or data may not be appropriate`);
-            return false;
+            return null;
         }
-
-        if (data.includes("<d:") || data.includes("</d:"))
+        else if (data.includes("<d:") || data.includes("</d:"))
         {
-            data = await data.replaceAll("<d:", "<\\d:");
-            data = await data.replaceAll("</d:", "<\\/d:");
+            console.error(`hardUpdate Error: Make sure escape any '<d:' or '</d'.`);
+            return null;
         }
 
-        let isExists1 = await this.isOpenTagExists(name);
-        let isExists2 = await this.isCloseTagExists(name);
-
-        if (!isExists1.result || !isExists2.result)
+        const result = await this.pushTask(async () =>
         {
-            console.error(`hardUpdate Error: Tag "<d:${ name }>" is not found in file`)
-            return false;
-        }
-        else if (isExists1.position < 0 || isExists2.position < 0)
-        {
-            console.error(`hardUpdate Error: file position cannot be negative`);
-            return false;
-        }
+            let isExists1 = await this.processIsOpenTagExists(name);
 
-        await this.waitForReadingCountToBeZero()
-        this.lock = true;
-        await this.mutex.acquire();
+            if (!isExists1 || !isExists1.result)
+            {
+                console.error(`hardUpdate Error: Open Tag "<d:${ name }>" is not found in file`)
+                return null;
+            }
+            else if (!isExists1.position && isExists1.position < 0)
+            {
+                console.error(`hardUpdate Error: Open Tag file position is negative value. Eg. null, value < 0`);
+                return null;
+            }
 
-        let resultRemove = await this.processHardRemove(name);
-        await fs.promises.rename(`${ this.filename }.tmp`, this.filename)
-            .catch((error) => { resultRemove = false; console.error(error); });
+            let isExists2 = await this.processIsCloseTagExists(name, isExists1.position);
 
-        if (!resultRemove)
-        {
-            console.error(`hardUpdate Error: Could not remove "<d:${ name }>". Data is not inserted. Try clean a file and then 'push' data instead of using 'hardUpdate'.`)
-            return false;
-        }
+            if (!isExists2 || !isExists2.result)
+            {
+                console.error(`hardUpdate Error: Open Tag "<d:${ name }>" is not found in file`)
+                return null;
+            }
+            else if (!isExists2.position && isExists2.position < 0)
+            {
+                console.error(`hardUpdate Error: Open Tag file position is negative value. Eg. null, value < 0`);
+                return null;
+            }
 
-        let result = await this.processPushing(name, data);
 
-        await this.mutex.release();
-        this.lock = false;
+
+            let resultRemove = await this.processHardRemove(name);
+
+            await fs.promises.rename(`${ this.filename }.tmp`, this.filename)
+                .catch((error) => { resultRemove = false; console.error(error); });
+
+            if (!resultRemove)
+            {
+                console.error(`hardUpdate Error: Could not remove "<d:${ name }>". Data is not inserted. Try clean a file and then 'push' data instead of using 'hardUpdate'.`)
+                return null;
+            }
+
+            const result = await this.processPushing(name, data);
+
+            return result;
+        });
+
         return result;
     }
 
-    async isOpenTagExists(name)
+    async isOpenTagExists(name, position = 0)
     {
-        if (!name) throw new Error("isOpenTagExists Error: name may not be appropriate");
-
-        return new Promise((resolve, reject) =>
+        if (!name)
         {
-            if (!this.lock)
-            {
-                this.readingCount = this.readingCount + 1;
+            console.error("isOpenTagExists Error: name may not be appropriate");
+            return false;
+        }
 
-                this.processIsOpenTagExists(name).then(result =>
-                {
-                    this.readingCount = this.readingCount - 1;
-                    resolve(result);
-                }).catch(error =>
-                {
-                    this.readingCount = this.readingCount - 1;
-                    reject(error);
-                });
-            }
-        }).catch(error => { console.error(error); })
+        const result = await this.pushTask(async () =>
+        {
+            let result = await this.processIsOpenTagExists(name, position);
+
+            if (result) return result;
+            else return false;
+        });
+
+        return result;
     }
 
-    processIsOpenTagExists(name)
+    processIsOpenTagExists(name, startPosition = 0)
     {
         return new Promise((resolve, reject) =>
         {
             let tagStart = `<d:${ name }>`;
             let processingChunk = "";
             let previousChunk = "";
-            let indexStart = 0;
+            let index = startPosition;
             let founded = false;
 
             const reader = fs.createReadStream(this.filename, { highWaterMark: this.highWaterMark, encoding: this.encoding });
@@ -679,9 +705,9 @@ module.exports = class Tot
 
                 while (processingChunk.length > 0)
                 {
-                    indexStart = processingChunk.indexOf(tagStart);
+                    index = processingChunk.indexOf(tagStart);
 
-                    if (indexStart > -1)
+                    if (index > -1)
                     {
                         founded = true;
                         let position = reader.bytesRead - this.highWaterMark;
@@ -690,7 +716,7 @@ module.exports = class Tot
                         let chunkLength = Buffer.byteLength(processingChunk, this.encoding);
                         let margin = chunkLength - this.highWaterMark;
 
-                        processingChunk = processingChunk.substring(0, indexStart)
+                        processingChunk = processingChunk.substring(0, index)
                         if (margin < 0) margin = 0;
                         position = position + Buffer.byteLength(processingChunk, this.encoding) - margin;
 
@@ -712,42 +738,38 @@ module.exports = class Tot
             });
             reader.on('end', () =>
             {
-                if (!founded) resolve({ result: false, position: -1 });
+                if (!founded) resolve({ result: null, position: -1 });
             });
-        }).catch(error => { throw error; });
+        }).catch(error => { console.error(error); return false; });
     }
 
-    async isCloseTagExists(name)
+    async isCloseTagExists(name, position = 0)
     {
-        if (!name) throw new Error("isCloseTagExists Error: name may not be appropriate");
-
-        return new Promise((resolve, reject) =>
+        if (!name)
         {
-            if (!this.lock)
-            {
-                this.readingCount = this.readingCount + 1;
+            console.error("isCloseTagExists Error: name may not be appropriate");
+            return false;
+        }
 
-                this.processIsCloseTagExists(name).then(result =>
-                {
-                    this.readingCount = this.readingCount - 1;
-                    resolve(result);
-                }).catch(error =>
-                {
-                    this.readingCount = this.readingCount - 1;
-                    reject(error);
-                });
-            }
-        }).catch(error => { console.error(error); })
+        const result = await this.pushTask(async () =>
+        {
+            let result = await this.processIsCloseTagExists(name, position);
+
+            if (result) return result;
+            else return false;
+        });
+
+        return result;
     }
 
-    processIsCloseTagExists(name)
+    processIsCloseTagExists(name, startPosition = 0)
     {
         return new Promise((resolve, reject) =>
         {
             let tagClose = `</d:${ name }>`;
             let processingChunk = "";
             let previousChunk = "";
-            let index = 0;
+            let index = startPosition;
             let founded = false;
 
             const reader = fs.createReadStream(this.filename, { highWaterMark: this.highWaterMark, encoding: this.encoding });
@@ -798,12 +820,11 @@ module.exports = class Tot
             });
             reader.on('end', () =>
             {
-                if (!founded) resolve({ result: false, position: -1 });
+                if (!founded) resolve({ result: null, position: -1 });
             });
-        }).catch(error => { throw error; });
+        }).catch(error => { console.error(error); return false; });
     }
 
-    // It only replace data with empty space from file. 
     async hardRemove(name)
     {
         if (!name)
@@ -812,30 +833,42 @@ module.exports = class Tot
             return false;
         }
 
-        let isExists = await this.isOpenTagExists(name);
-
-        if (!isExists.result)
+        const result = await this.pushTask(async () =>
         {
-            console.error(`hardRemove Error: Tag "<d:${ name }>" is not found in file`)
-            return false;
-        }
-        else if (isExists.position < 0)
-        {
-            console.error(`hardRemove Error: file position cannot be negative`);
-            return false;
-        }
+            let isExists1 = await this.processIsOpenTagExists(name);
 
-        await this.waitForReadingCountToBeZero();
-        this.lock = true;
-        await this.mutex.acquire();
+            if (!isExists1 || !isExists1.result)
+            {
+                console.error(`hardRemove Error: Open Tag "<d:${ name }>" is not found in file`)
+                return false;
+            }
+            else if (!isExists1.position && isExists1.position < 0)
+            {
+                console.error(`hardRemove Error: Open Tag file position is negative value. Eg. null, value < 0`);
+                return false;
+            }
 
-        let result = await this.processHardRemove(name);
+            let isExists2 = await this.processIsCloseTagExists(name, isExists1.position);
 
-        await fs.promises.rename(`${ this.filename }.tmp`, this.filename)
-            .catch((error) => { result = false; console.error(error); });
+            if (!isExists2 || !isExists2.result)
+            {
+                console.error(`hardRemove Error: Open Tag "<d:${ name }>" is not found in file`)
+                return false;
+            }
+            else if (!isExists2.position && isExists2.position < 0)
+            {
+                console.error(`hardRemove Error: Open Tag file position is negative value. Eg. null, value < 0`);
+                return false;
+            }
 
-        await this.mutex.release();
-        this.lock = false;
+            let result = await this.processHardRemove(name);
+
+            await fs.promises.rename(`${ this.filename }.tmp`, this.filename)
+                .catch((error) => { result = false; console.error(error); });
+
+            return result;
+        });
+
         return result;
     }
 
@@ -970,33 +1003,41 @@ module.exports = class Tot
             return false;
         }
 
-        let isExists1 = await this.isOpenTagExists(name);
-        let isExists2 = await this.isCloseTagExists(name);
-
-        if (!isExists1.result || !isExists2.result)
+        const result = await this.pushTask(async () =>
         {
-            console.error(`remove Error: Tag "<d:${ name }>" is not found in file`)
-            return false;
-        }
-        else if (isExists1.position < 0 || isExists2.position < 0)
-        {
-            console.error(`remove Error: file position cannot be negative`);
-            return false;
-        }
+            let isExists1 = await this.processIsOpenTagExists(name);
 
-        await this.waitForReadingCountToBeZero();
-        this.lock = true;
-        await this.mutex.acquire();
+            if (!isExists1 || !isExists1.result)
+            {
+                console.error(`remove Error: Open Tag "<d:${ name }>" is not found in file`)
+                return false;
+            }
+            else if (!isExists1.position && isExists1.position < 0)
+            {
+                console.error(`remove Error: Open Tag file position is negative value. Eg. null, value < 0`);
+                return false;
+            }
 
-        let result1 = await this.processRemoveOpenTag(name, isExists1.position);
-        let result2 = await this.processRemoveCloseTag(name, isExists2.position);
-        let result = true;
+            let isExists2 = await this.processIsCloseTagExists(name, isExists1.position);
 
-        if (result1 && result2) result = true;
-        else result = false;
+            if (!isExists2 || !isExists2.result)
+            {
+                console.error(`remove Error: Open Tag "<d:${ name }>" is not found in file`)
+                return false;
+            }
+            else if (!isExists2.position && isExists2.position < 0)
+            {
+                console.error(`remove Error: Open Tag file position is negative value. Eg. null, value < 0`);
+                return false;
+            }
 
-        await this.mutex.release();
-        this.lock = false;
+            let result1 = await this.processRemoveOpenTag(name, isExists1.position);
+            let result2 = await this.processRemoveCloseTag(name, isExists2.position);
+
+            if (result1 && result2) return true;
+            else return false;
+        });
+
         return result;
     }
 
@@ -1161,17 +1202,16 @@ module.exports = class Tot
     // Remove all non-tag data from a file.
     async clean()
     {
-        await this.waitForReadingCountToBeZero();
-        this.lock = true;
-        await this.mutex.acquire();
+        const result = await this.pushTask(async () =>
+        {
+            let result = await this.processClean();
 
-        let result = await this.processClean();
+            await fs.promises.rename(`${ this.filename }.tmp`, this.filename)
+                .catch((error) => { result = false; console.error(error); });
 
-        await fs.promises.rename(`${ this.filename }.tmp`, this.filename)
-            .catch((error) => { result = false; console.error(error); });
+            return result;
+        });
 
-        await this.mutex.release();
-        this.lock = false;
         return result;
     }
 
@@ -1287,60 +1327,6 @@ module.exports = class Tot
         {
             console.error(error);
             return false;
-        });
-    }
-
-    // Deprecated since we are not allowing escaping for tags
-    async escapeTags(data)
-    {
-        let result = [];
-
-        for (let i = 0; i < data.length; i++)
-        {
-            if ((data[i] == '<' && data.substring(i, i + 3) == '<b:' || data.substring(i, i + 4) == '</b:') && (i == 0 || data[i - 1] != '\\'))
-            {
-                result.push('\\');
-            }
-
-            result.push(data[i]);
-        }
-
-        return result.join('');
-    }
-
-    // Deprecated since we are not allowing escaping for tags
-    async unescapeTags(data)
-    {
-        let result = [];
-
-        for (let i = 0; i < data.length; i++)
-        {
-            if (data[i] == '\\' && (data.substring(i + 1, i + 4) == '<b:' || data.substring(i + 1, i + 5) == '</b:'))
-            {
-                i++;
-            }
-
-            result.push(data[i]);
-        }
-
-        return result.join('');
-    }
-
-    waitForReadingCountToBeZero()
-    {
-        return new Promise(resolve =>
-        {
-            const checkCount = () =>
-            {
-                if (this.readingCount === 0)
-                {
-                    resolve();
-                } else
-                {
-                    setTimeout(checkCount, 10);
-                }
-            };
-            checkCount();
         });
     }
 }

@@ -1,160 +1,28 @@
 const Tot = require('../src/index.js');
+const tot = new Tot("./test/data.tot", 1024, 'utf8');
 
-async function test()
+test(`test getDataByName("dog")`, async () =>
 {
-    const tot = new Tot("data.tot", 'utf8', 1024);
+    const data = await tot.getDataByName("dog")
+    let result = false;
+    if (data.includes("The dog is a domesticated descendant of the wolf.")) result = true;
+    expect(result).toBe(true);
+});
 
-    console.log(await tot.getDataByName("dog"));
-    /*
-    await tot.getDataByName("cat").then(function (result)
-    {
-        console.log(result);
-    });
+test(`test push("rabbit"), this prints error`, async () =>
+{
+    const data = await tot.push("rabbit", "Rabbits are small mammals in the family.")
+    expect(data).toBe(false);
+});
 
-    let data;
+test(`test hardRemove("frog")`, async () =>
+{
+    const data = await tot.hardRemove("frog")
+    expect(data).toBe(true);
+});
 
-    await tot.getDataByName("horse").then(function (result)
-    {
-        data = result;
-    });
-    console.log(data);
-
-    await tot.push("frog", "A frog is any member of a diverse and carnivorous group of tailless amphibians belonging to the order Anura.").then((result) =>
-    {
-        console.log(`frog push returns: ${ result }`);
-    });
-    await tot.push("duck", "Duck is the bird from numerous species of waterfowl in the family Anatidae.")
-        .then((result) =>
-        {
-            console.log(`duck push returns: ${ result }`);
-        });
-    await tot.push("rabbit", "Rabbits are small mammals in the family.")
-        .then((result) =>
-        {
-            console.log(`rabbit push returns: ${ result }`);
-        });
-    await tot.push("test", "this is a test")
-        .then((result) =>
-        {
-            console.log(`test push returns: ${ result }`);
-        });
-    await tot.getDataByName("rabbit")
-        .then((result) =>
-        {
-            console.log(result);
-        });
-
-    await tot.getDataByName("test")
-        .then((result) =>
-        {
-            console.log(result);
-        });
-    await tot.getDataByName("test3")
-        .then((result) =>
-        {
-            console.log(result);
-        });
-
-    await tot.isOpenTagExists("test")
-        .then((result) =>
-        {
-            console.log(`test exists?: ${ result.result }`);
-        });
-
-    await tot.isOpenTagExists("rabbit")
-        .then((result) =>
-        {
-            console.log(`rabbit exists?: ${ result.result }`);
-        });
-
-    await tot.isOpenTagExists("test2")
-        .then((result) =>
-        {
-            console.log(`test2 exists?: ${ result.result }`);
-        });
-    await tot.push("test", "this is a test")
-        .then((result) =>
-        {
-            console.log(`test push returns: ${ result }`);
-        });
-    await tot.hardRemove("rabbit")
-        .then((result) =>
-        {
-            console.log(result);
-        });
-    await tot.remove("test")
-        .then((result) =>
-        {
-            console.log(result);
-        });
-    await tot.remove("duck")
-        .then((result) =>
-        {
-            console.log(result);
-        });
-    await tot.push("rabbit", "Rabbits are small mammals in the family.")
-        .then((result) =>
-        {
-            console.log(`rabbit push returns: ${ result }`);
-        });
-    await tot.remove("rabbit")
-        .then((result) =>
-        {
-            console.log(result);
-        });
-    await tot.remove("frog")
-        .then((result) =>
-        {
-            console.log(result);
-        });
-    await tot.push("rabbit", "Rabbits are small mammals in the family.")
-        .then((result) =>
-        {
-            console.log(`rabbit push returns: ${ result }`);
-        });
-    await tot.push("frog", "A frog is any member of a diverse and carnivorous group of tailless amphibians belonging to the order Anura.")
-        .then((result) =>
-        {
-            console.log(`frog push returns: ${ result }`);
-        });
-    await tot.clean();
-
-    await tot.open("test.tot");
-    await tot.create();
-    await tot.push("frog", "A frog is any member of a diverse and carnivorous group of tailless amphibians belonging to the order Anura.")
-        .then((result) =>
-        {
-            console.log(`frog push returns2: ${ result }`);
-        });
-    await tot.getDataByName("frog")
-        .then((result) =>
-        {
-            console.log(result);
-        });
-    await tot.push("test", "<\\d:test>This is test!<\\/d:test>")
-        .then((result) =>
-        {
-            console.log(`test push returns2: ${ result }`);
-        });
-    await tot.getDataByName("test")
-        .then((result) =>
-        {
-            console.log(result);
-        });
-    await tot.open("data.tot");
-    await tot.getAll()
-        .then((result) =>
-        {
-            console.log("get all working");
-            console.log(result);
-        })
-    */
-    await tot.getDataByPrefix("ho", 2)
-        .then((result) =>
-        {
-            console.log("prefix working?");
-            console.log(result);
-        })
-}
-
-test();
+test(`test push("frog")`, async () =>
+{
+    const data = await tot.push("frog", "A frog is any member of a diverse and carnivorous group of tailless amphibians belonging to the order Anura.")
+    expect(data).toBe(true);
+});

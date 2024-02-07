@@ -20,7 +20,6 @@ module.exports = class Semaphore
             else 
             {
                 this.waitingQueue.push(resolve);
-
             }
 
         });
