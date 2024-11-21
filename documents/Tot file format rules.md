@@ -46,25 +46,12 @@
 </r:TagName>
 ```
 
-5. Escaping. You can use entities or use your own escaping mechanism. But we support one escaping mechanism by default. If you don't escape your data would not be added to the file.
+5. Escaping. You can use entities or use your own escaping mechanism.
 
 ```
-// our escaping in manual typing
 <\d:
 <\/d:
-// They are going to converted for you when you call get function.
-<\d: -> <d:
-<\/d: -> </d:
-
-//If you use it within programming language, string:
-// our escaping
-<\\d:
-<\\/d:
-// They are going to converted for you when you call get function.
-<\\d: -> <d:
-<\\/d: -> </d:
 ```
 
-6. Escaping for strings or characters above not allowed
-7. The structure of format shound not be changed by version of format.
-8. By keeping all of the rules this format itself will be straight forward and flexible until our technology makes a big change
+6. The structure of format shound not be changed by version of format.
+7. By keeping all of the rules this format itself will be straight forward and flexible until our technology makes a big change

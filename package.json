@@ -1,14 +1,16 @@
 {
   "name": "totjs",
-  "version": "1.0.0",
+  "version": "2.0.1",
   "description": "Markup-like Database without Indexing",
   "main": "dist/index.js",
+  "type": "module",
   "bin": {
     "totjs": "dist/index.js"
   },
   "scripts": {
-    "pack": "npx webpack --config webpack.config.js",
-    "test": "npx jest"
+    "pack": "node pack/index.js",
+    "webpack": "npx webpack --config webpack.config.js",
+    "test": "jest"
   },
   "repository": {
     "type": "git",
@@ -30,13 +32,13 @@
   },
   "homepage": "https://github.com/opdev1004/totjs#readme",
   "devDependencies": {
+    "@babel/core": "^7.26.0",
+    "@babel/preset-env": "^7.26.0",
     "jest": "^29.7.0",
-    "webpack": "^5.75.0",
-    "webpack-cli": "^5.0.1"
+    "webpack": "^5.96.1",
+    "webpack-cli": "^5.1.4"
   },
-  "jest": {
-    "testMatch": [
-      "<rootDir>/test/**/*.js"
-    ]
+  "dependencies": {
+    "chalk": "^5.3.0"
   }
 }
