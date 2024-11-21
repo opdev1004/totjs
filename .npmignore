@@ -1,3 +1,5 @@
+coverage/
+pack/
 documents/
 test/
 src/
@@ -6,3 +8,5 @@ src/
 .gitignore
 jest.config.js
 webpack.config.js
+babel.config.json
+jest.config.json
